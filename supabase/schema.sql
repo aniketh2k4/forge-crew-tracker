@@ -6,6 +6,11 @@ create table if not exists public.profiles (
   display_name text not null default 'Athlete',
   training_experience text not null default 'Just starting',
   training_start_date date,
+  age smallint check (age between 18 and 80),
+  sex_calc text not null default 'average' check (sex_calc in ('male','female','average')),
+  height_cm numeric(5,1) check (height_cm between 100 and 250),
+  activity_level text not null default 'moderate' check (activity_level in ('sedentary','light','moderate','active')),
+  weight_goal text not null default 'maintain' check (weight_goal in ('lose','maintain','gain')),
   calorie_goal integer not null default 2200 check (calorie_goal between 500 and 10000),
   protein_goal_g integer not null default 150 check (protein_goal_g between 10 and 1000),
   created_at timestamptz not null default now(),
@@ -79,6 +84,17 @@ create table if not exists public.meals (
   created_at timestamptz not null default now()
 );
 create index if not exists meals_user_date_idx on public.meals(user_id, meal_date desc);
+
+create table if not exists public.weight_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  weight_kg numeric(6,2) not null check (weight_kg between 25 and 350),
+  measured_on date not null default current_date,
+  entry_type text not null default 'monthly' check (entry_type in ('monthly','weekly')),
+  created_at timestamptz not null default now(),
+  unique (user_id, measured_on)
+);
+create index if not exists weight_entries_user_date_idx on public.weight_entries(user_id, measured_on desc);
 
 create or replace function public.handle_new_forge_user()
 returns trigger language plpgsql security definer set search_path = '' as $$
@@ -161,6 +177,7 @@ alter table public.workout_sessions enable row level security;
 alter table public.workout_exercises enable row level security;
 alter table public.workout_sets enable row level security;
 alter table public.meals enable row level security;
+alter table public.weight_entries enable row level security;
 
 revoke all on public.profiles, public.crews, public.crew_members, public.workout_sessions,
   public.workout_exercises, public.workout_sets, public.meals from anon, authenticated;
@@ -169,6 +186,7 @@ grant select on public.crews, public.crew_members to authenticated;
 grant select, insert, update, delete on public.workout_sessions,
   public.workout_exercises, public.workout_sets to authenticated;
 grant select, insert, update, delete on public.meals to authenticated;
+grant select, insert, update, delete on public.weight_entries to authenticated;
 
 create policy "Profile owner can read" on public.profiles for select to authenticated using (user_id = (select auth.uid()));
 create policy "Profile owner can create" on public.profiles for insert to authenticated with check (user_id = (select auth.uid()));
@@ -220,6 +238,10 @@ create policy "Meal owner can read" on public.meals for select to authenticated 
 create policy "Meal owner can create" on public.meals for insert to authenticated with check (user_id = (select auth.uid()));
 create policy "Meal owner can update" on public.meals for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 create policy "Meal owner can delete" on public.meals for delete to authenticated using (user_id = (select auth.uid()));
+create policy "Weight owner can read" on public.weight_entries for select to authenticated using (user_id = (select auth.uid()));
+create policy "Weight owner can create" on public.weight_entries for insert to authenticated with check (user_id = (select auth.uid()));
+create policy "Weight owner can update" on public.weight_entries for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy "Weight owner can delete" on public.weight_entries for delete to authenticated using (user_id = (select auth.uid()));
 
 revoke execute on function public.is_crew_member(uuid) from public, anon;
 revoke execute on function public.create_crew(text) from public, anon;
