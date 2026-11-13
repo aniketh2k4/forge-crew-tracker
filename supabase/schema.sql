@@ -147,7 +147,7 @@ begin
   from public.crews c where upper(c.invite_code) = upper(trim(p_code)) limit 1;
   if v_id is null then raise exception 'That invite code was not found'; end if;
   insert into public.crew_members (crew_id, user_id, role)
-  values (v_id, auth.uid(), 'member') on conflict (crew_id, user_id) do nothing;
+  values (v_id, auth.uid(), 'member') on conflict do nothing;
   return query select v_id, v_name, v_code;
 end;
 $$;
